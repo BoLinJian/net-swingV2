@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>*{box-sizing:border-box}body{margin:0}</style>
+<title>Net Swing 計算器</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: 單欄操作台 — 上方輸入兩輪票數，下方即時顯示兩方 Swing 與勝方 */
+:root{
+  --bg:#f3f4f7; --panel:#ffffff; --fg:#1b1f2a; --muted:#5d6475; --line:#d9dce4;
+  --pro:#1f5fbf; --con:#b4402a; --und:#7a7f8c; --win:#1d7a4a;
+  --sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12151c; --panel:#1b202a; --fg:#e8eaf0; --muted:#9aa1b2; --line:#2e3442;
+  --pro:#6fa3f2; --con:#ec8a72; --und:#9aa0ad; --win:#5cc98f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12151c; --panel:#1b202a; --fg:#e8eaf0; --muted:#9aa1b2; --line:#2e3442;
+  --pro:#6fa3f2; --con:#ec8a72; --und:#9aa0ad; --win:#5cc98f; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.6}
+.wrap{max-width:760px;margin:0 auto;padding-block:28px 48px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:22px}
+h1{font-size:26px;font-weight:900;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0}
+.formula{font-family:var(--mono);background:var(--panel);border:1px solid var(--line);border-radius:6px;
+  padding:10px 14px;font-size:15px;overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.tbl{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+th,td{padding:10px 12px;text-align:right;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+thead th{font-size:12px;letter-spacing:.06em;color:var(--muted);font-weight:500}
+tbody tr:last-child td{border-bottom:none}
+input{width:5.5em;font:600 16px var(--mono);text-align:right;padding:6px 8px;border:1px solid var(--line);
+  border-radius:5px;background:var(--bg);color:var(--fg)}
+input:focus-visible{outline:2px solid var(--pro);outline-offset:1px}
+.side{font-weight:700}.pro{color:var(--pro)}.con{color:var(--con)}.und{color:var(--und)}
+.pct{font-family:var(--mono);color:var(--muted);font-size:13px}
+.results{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;min-width:0}
+.card h2{margin:0;font-size:14px;letter-spacing:.06em}
+.big{font:600 40px/1.1 var(--mono);margin:8px 0 4px}
+.bar{height:10px;background:var(--line);border-radius:5px;position:relative;overflow:hidden}
+.bar i{position:absolute;top:0;bottom:0;left:50%}
+.detail{font-size:13px;color:var(--muted)}
+.verdict{background:var(--panel);border:2px solid var(--win);border-radius:8px;padding:14px 16px;font-size:17px;font-weight:700}
+.verdict small{display:block;font-weight:400;font-size:13px;color:var(--muted);margin-top:4px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+button{font:500 14px var(--sans);padding:8px 14px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer}
+button:focus-visible{outline:2px solid var(--pro)}
+.note{font-size:13px;color:var(--muted)}
+@media (max-width:520px){.results{grid-template-columns:1fr}.big{font-size:34px}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Net Swing 計算器</h1>
+    <p class="sub">115 年度精神病學辯論會 · Maudsley 模式立場淨轉移率</p>
+  </header>
+
+  <div class="formula">Net Swing = Post-vote % − Pre-vote %</div>
+
+  <div class="tbl">
+    <table>
+      <thead><tr><th>立場</th><th>初測票數 (Pre)</th><th>終測票數 (Post)</th></tr></thead>
+      <tbody>
+        <tr><td class="side pro">正方 (贊成)</td>
+          <td><input id="preP" type="number" min="0" inputmode="numeric" value="62"><div class="pct" id="preP%"></div></td>
+          <td><input id="postP" type="number" min="0" inputmode="numeric" value="70"><div class="pct" id="postP%"></div></td></tr>
+        <tr><td class="side con">反方 (反對)</td>
+          <td><input id="preC" type="number" min="0" inputmode="numeric" value="28"><div class="pct" id="preC%"></div></td>
+          <td><input id="postC" type="number" min="0" inputmode="numeric" value="42"><div class="pct" id="postC%"></div></td></tr>
+        <tr><td class="side und">未定</td>
+          <td><input id="preU" type="number" min="0" inputmode="numeric" value="30"><div class="pct" id="preU%"></div></td>
+          <td><input id="postU" type="number" min="0" inputmode="numeric" value="8"><div class="pct" id="postU%"></div></td></tr>
+        <tr><td>合計</td><td id="preT" class="pct"></td><td id="postT" class="pct"></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="results">
+    <div class="card"><h2 class="pro">正方 Net Swing</h2><div class="big pro" id="swP"></div>
+      <div class="bar"><i id="barP" style="background:var(--pro)"></i></div><div class="detail" id="dP"></div></div>
+    <div class="card"><h2 class="con">反方 Net Swing</h2><div class="big con" id="swC"></div>
+      <div class="bar"><i id="barC" style="background:var(--con)"></i></div><div class="detail" id="dC"></div></div>
+  </div>
+
+  <div class="verdict" id="verdict"></div>
+
+  <div class="row">
+    <button id="clear" type="button">清空重新輸入</button>
+    <button id="copy" type="button">複製結果文字</button>
+  </div>
+  <p class="note">預設為示範數字。百分比以各輪總票數（含未定）為分母；勝負依兩方 Net Swing 高低判定，不看終局絕對票數。</p>
+</div>
+
+<script>
+const ids=["preP","preC","preU","postP","postC","postU"];
+const $=id=>document.getElementById(id);
+const n=id=>Math.max(0,parseFloat($(id).value)||0);
+const f=x=>(x>0?"+":"")+x.toFixed(1)+" %";
+let summary="";
+function calc(){
+  const pre={P:n("preP"),C:n("preC"),U:n("preU")}, post={P:n("postP"),C:n("postC"),U:n("postU")};
+  const tPre=pre.P+pre.C+pre.U, tPost=post.P+post.C+post.U;
+  const pc=(v,t)=>t?v/t*100:0;
+  for(const k of ["P","C","U"]){
+    $("pre"+k+"%").textContent=pc(pre[k],tPre).toFixed(1)+"%";
+    $("post"+k+"%").textContent=pc(post[k],tPost).toFixed(1)+"%";
+  }
+  $("preT").textContent=tPre+" 票";$("postT").textContent=tPost+" 票";
+  const sP=pc(post.P,tPost)-pc(pre.P,tPre), sC=pc(post.C,tPost)-pc(pre.C,tPre);
+  $("swP").textContent=f(sP);$("swC").textContent=f(sC);
+  $("dP").textContent=pc(pre.P,tPre).toFixed(1)+"% → "+pc(post.P,tPost).toFixed(1)+"%";
+  $("dC").textContent=pc(pre.C,tPre).toFixed(1)+"% → "+pc(post.C,tPost).toFixed(1)+"%";
+  const m=Math.max(10,Math.abs(sP),Math.abs(sC));
+  for(const [b,s] of [["barP",sP],["barC",sC]]){
+    const w=Math.abs(s)/m*50; $(b).style.width=w+"%"; $(b).style.left=(s>=0?50:50-w)+"%";
+  }
+  let v,why;
+  if(!tPre||!tPost){v="請輸入兩輪票數";why="";}
+  else if(Math.abs(sP-sC)<0.05){v="平手";why="兩方 Net Swing 相同。";}
+  else{const pro=sP>sC;v=(pro?"正方":"反方")+"勝出";
+    why=`${pro?"正方":"反方"} Net Swing ${f(pro?sP:sC)}，高於${pro?"反方":"正方"}的 ${f(pro?sC:sP)}（差 ${Math.abs(sP-sC).toFixed(1)} 個百分點）。`;}
+  $("verdict").innerHTML=v+(why?`<small>${why}</small>`:"");
+  summary=`Net Swing 結果\n正方：${$("dP").textContent}（${f(sP)}）\n反方：${$("dC").textContent}（${f(sC)}）\n判定：${v}`;
+}
+ids.forEach(id=>$(id).addEventListener("input",calc));
+$("clear").onclick=()=>{ids.forEach(id=>$(id).value="");calc();$("preP").focus();};
+$("copy").onclick=async e=>{try{await navigator.clipboard.writeText(summary);e.target.textContent="已複製";}
+  catch{e.target.textContent="無法複製，請手動選取";}setTimeout(()=>e.target.textContent="複製結果文字",1500);};
+calc();
+</script>
+</body>
+</html>
